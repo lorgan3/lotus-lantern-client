@@ -16,14 +16,17 @@ async def scan():
 
 # Send a command to a given device.
 async def send_command(command: bytearray, client: BleakClient):
-    target = list(client.services.characteristics.values())[-1].uuid
+    for characteristic in client.services.characteristics.values():
+        try:
+            # For some reason it only works when sending the command twice.
+            for i in range(0, 2):
+                # Don't know why but without reading we can't write
+                await client.read_gatt_char(characteristic.uuid)
 
-    # For some reason it only works when sending the command twice.
-    for i in range(0, 2):
-        # Don't know why but without reading we can't write
-        await client.read_gatt_char(target)
-
-        await client.write_gatt_char(target, command)
+                await client.write_gatt_char(characteristic.uuid, command)
+        except:
+            # Seems like ELK-BLEDOM needs to write to the first characteristic and ELK-BLEDOB to the last one. Just ignore errors
+            pass
 
 
 # Connect to a device using name or uuid, send 1 command and then disconnect.
