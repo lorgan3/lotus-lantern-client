@@ -1,3 +1,0 @@
-asyncio==3.4.3
-argparse==1.4.0
-bleak==0.22.3

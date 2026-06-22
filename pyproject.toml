@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lotus-lantern-client"
+version = "0.1.0"
+description = "Control ELK-BLEDOM / ELK-BLEDOB led strips without the lotus lantern app."
+readme = "README.md"
+requires-python = ">=3.8"
+dependencies = ["bleak>=0.22.3"]
+
+[project.scripts]
+lotus-lantern = "lotus_lantern.core:cli"
+
+[tool.setuptools.packages.find]
+where = ["src"]
