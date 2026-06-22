@@ -2,7 +2,7 @@ import asyncio
 import argparse
 from bleak import BleakClient, BleakScanner
 
-from protocol import COMMANDS, EFFECTS
+from .protocol import COMMANDS, EFFECTS
 
 
 # Print all found devices.
@@ -49,19 +49,30 @@ async def send_command_once(command: bytearray, name: str = None, uuid: str = No
         # Some strips advertise their name with stray whitespace (e.g.
         # "ELK-BLEDOM ") and the name may arrive via the advertisement's
         # local_name rather than device.name, so match leniently on both.
-        target = name.strip().lower()
+        wanted = name.strip().lower()
         device = await BleakScanner.find_device_by_filter(
-            lambda device, data: target in {
+            lambda device, data: wanted in {
                 (device.name or "").strip().lower(),
                 (data.local_name or "").strip().lower(),
             }
         )
+        target = name
     elif uuid is not None:
         device = await BleakScanner.find_device_by_filter(
             lambda device, data: device.address == uuid
         )
+        target = uuid
     else:
         raise ValueError("You must provide either a name or a uuid")
+
+    # find_device_by_filter returns None when nothing matches. Bail out with a
+    # clear message instead of letting it crash on `None.address` below.
+    if device is None:
+        raise RuntimeError(
+            f"No device matching '{target}' was found. "
+            "Make sure the strip is powered on and in range, and run without "
+            "arguments to list nearby devices."
+        )
 
     async with BleakClient(device.address) as client:
         await send_command(command, client)
@@ -74,7 +85,7 @@ async def main(command: bytearray = None, name: str = None, uuid: str = None):
         await send_command_once(command, name, uuid)
 
 
-if __name__ == "__main__":
+def cli():
     epilog = """
 Available commands are:
 \n\t- {commands}
@@ -123,3 +134,7 @@ Available effects are:
             command = COMMANDS[key](*intParams)
 
     asyncio.run(main(name=args.name, uuid=args.uuid, command=command))
+
+
+if __name__ == "__main__":
+    cli()
