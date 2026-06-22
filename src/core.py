@@ -16,24 +16,45 @@ async def scan():
 
 # Send a command to a given device.
 async def send_command(command: bytearray, client: BleakClient):
+    # Write the command to every characteristic that actually supports writing.
+    # We never read first: on some adapters (e.g. BlueZ on a Raspberry Pi)
+    # reading the notify characteristic drops the connection before we reach
+    # the command characteristic. ELK-BLEDOM and ELK-BLEDOB expose the command
+    # characteristic at different spots, so writing to all writable ones covers
+    # both without hardcoding a UUID.
     for characteristic in client.services.characteristics.values():
-        try:
-            # For some reason it only works when sending the command twice.
-            for i in range(0, 2):
-                # Don't know why but without reading we can't write
-                await client.read_gatt_char(characteristic.uuid)
+        if "write-without-response" in characteristic.properties:
+            response = False
+        elif "write" in characteristic.properties:
+            response = True
+        else:
+            continue
 
-                await client.write_gatt_char(characteristic.uuid, command)
-        except:
-            # Seems like ELK-BLEDOM needs to write to the first characteristic and ELK-BLEDOB to the last one. Just ignore errors
-            pass
+        try:
+            await client.write_gatt_char(characteristic.uuid, command, response=response)
+        except Exception as e:
+            # One model's characteristic may reject the write; that's expected.
+            # Log it instead of silently swallowing every error.
+            print(f"write to {characteristic.uuid} failed: {type(e).__name__}: {e}")
+
+    # A write-without-response is fire-and-forget: it returns once the packet is
+    # queued, not once it's sent. Give it time to flush before the caller
+    # disconnects, otherwise the command never reaches the strip.
+    await asyncio.sleep(0.5)
 
 
 # Connect to a device using name or uuid, send 1 command and then disconnect.
 async def send_command_once(command: bytearray, name: str = None, uuid: str = None):
     if name is not None:
+        # Some strips advertise their name with stray whitespace (e.g.
+        # "ELK-BLEDOM ") and the name may arrive via the advertisement's
+        # local_name rather than device.name, so match leniently on both.
+        target = name.strip().lower()
         device = await BleakScanner.find_device_by_filter(
-            lambda device, data: device.name == name
+            lambda device, data: target in {
+                (device.name or "").strip().lower(),
+                (data.local_name or "").strip().lower(),
+            }
         )
     elif uuid is not None:
         device = await BleakScanner.find_device_by_filter(

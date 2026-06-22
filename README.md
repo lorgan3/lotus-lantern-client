@@ -5,7 +5,7 @@ It can be used both from the command line or in a different python script.
 
 Big shout out to [ELK-BLEDOM-bluetooth-led-strip-controller](https://github.com/TheSylex/ELK-BLEDOM-bluetooth-led-strip-controller) for documenting the protocol. I'm not familiar with rust, so I decided to take the pieces I want and create a python script instead.
 
-I need to do something wonky to send the commands (read a characteristic and send the command twice) but it works fine so maybe that's just how it works for these led strips.
+Commands are sent as a Write Without Response to the writable characteristic. Because that write is fire-and-forget, the script waits briefly afterwards so the packet flushes before disconnecting — otherwise the command never reaches the strip (this was the cause of it working on macOS but not on a Raspberry Pi).
 
 ## Installation
 
