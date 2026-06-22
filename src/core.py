@@ -46,8 +46,15 @@ async def send_command(command: bytearray, client: BleakClient):
 # Connect to a device using name or uuid, send 1 command and then disconnect.
 async def send_command_once(command: bytearray, name: str = None, uuid: str = None):
     if name is not None:
+        # Some strips advertise their name with stray whitespace (e.g.
+        # "ELK-BLEDOM ") and the name may arrive via the advertisement's
+        # local_name rather than device.name, so match leniently on both.
+        target = name.strip().lower()
         device = await BleakScanner.find_device_by_filter(
-            lambda device, data: device.name == name
+            lambda device, data: target in {
+                (device.name or "").strip().lower(),
+                (data.local_name or "").strip().lower(),
+            }
         )
     elif uuid is not None:
         device = await BleakScanner.find_device_by_filter(
